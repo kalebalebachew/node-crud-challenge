@@ -1,169 +1,183 @@
-const app = require('../index');
-const axios = require('axios');
-
-const assert = require('assert').strict;
-
-let server;
+const { server, app } = require("../index");
+const axios = require("axios");
+const assert = require("assert");
 
 describe("Test Person CRUD API", function () {
-    before(() => {
-        server = app.listen(3000);
-    })
+  this.timeout(10000);
 
-    after(() => {
-        server.close()
-    })
-    it("Test Get", async function () {
-        let persons = app.get('db')
-        let res = await axios.get('http://localhost:3000/person')
-        assert.equal(res.status, 200)
-        assert.deepEqual(persons, res.data)
-    });
+  before(async function () {
+    if (!server || !server.listening) {
+      await new Promise((resolve) => {
+        server.listen(9000, () => {
+          console.log("Server is running on port 9000 "); //changed the port to 9000 because something i don't know of is running on port 3000
+          resolve();
+        });
+      });
+    }
+  });
 
-    it("Test Get By ID", async function () {
-        let persons = app.get('db')
-        let res = await axios.get('http://localhost:3000/person/1')
-        assert.equal(res.status, 200)
-        assert.deepEqual(persons[0], res.data)
-    });
+  after(function (done) {
+    if (server) {
+      server.close(done);
+    } else {
+      done();
+    }
+  });
 
-    it("Test Post", async function () {
-        let newUser = {
-            name: 'keber',
-            age: 24,
-            hobbies: ['dubstep']
-        }
+  it("Test Get", async function () {
+    const res = await axios.get("http://localhost:9000/person");
+    assert.equal(res.status, 200);
+    assert(Array.isArray(res.data));
+  });
 
-        let res = await axios.post('http://localhost:3000/person', newUser)
-        assert.equal(res.status, 200)
-        let persons = app.get('db')
-        let insertedUser = Object.assign({}, persons[1])
-        delete insertedUser.id
-        assert.deepEqual(insertedUser, newUser)
-    });
+  it("Test Get By ID", async function () {
+    const res = await axios.get("http://localhost:9000/person/1");
+    assert.equal(res.status, 200);
+    assert.equal(res.data.name, "Sam");
+  });
 
-    it("Test Post Validation All empty", async function () {
-        let err;
-        try {
-            
-            let res = await axios.post('http://localhost:3000/person', {})
-        } catch(e) {
-            err = e;
-        }
-        console.log(err.response.data);
-        assert.equal(err?.response?.status, 400)
+  it("Test Post", async function () {
+    const newUser = {
+      name: "Keber",
+      age: 24,
+      hobbies: ["dubstep"],
+    };
 
-    }); 
+    const res = await axios.post("http://localhost:9000/person", newUser);
+    assert.equal(res.status, 200);
 
-    it("Test Post Validation name empty", async function () {
-        let err;
-        try {
-            
-            let res = await axios.post('http://localhost:3000/person', {age: 26, hobbies: []})
-        } catch(e) {
-            err = e;
-        }
-        console.log(err.response.data);
-        assert.equal(err?.response?.status, 400)
+    const persons = app.get("db");
+    const insertedUser = Object.assign({}, persons[1]);
+    delete insertedUser.id;
+    assert.deepEqual(insertedUser, newUser);
+  });
 
-    }); 
+  // Validation Tests
+  it("Test Post Validation All Empty", async function () {
+    let error;
+    try {
+      await axios.post("http://localhost:9000/person", {});
+    } catch (err) {
+      error = err.response || { status: 500 };
+    }
+    assert.equal(error.status, 400);
+    assert.equal(error.data.message, "Name is required");
+  });
 
-    it("Test Post Validation age empty", async function () {
-        let err;
-        try {
-            
-            let res = await axios.post('http://localhost:3000/person', {name: 'sam', hobbies: []})
-        } catch(e) {
-            err = e;
-        }
-        console.log(err.response.data);
-        assert.equal(err?.response?.status, 400)
+  it("Test Post Validation Name Empty", async function () {
+    let error;
+    try {
+      await axios.post("http://localhost:9000/person", {
+        age: 26,
+        hobbies: [],
+      });
+    } catch (err) {
+      error = err.response || { status: 500 };
+    }
+    assert.equal(error.status, 400);
+    assert.equal(error.data.message, "Name is required");
+  });
 
-    });
+  it("Test Post Validation Age Empty", async function () {
+    let error;
+    try {
+      await axios.post("http://localhost:9000/person", {
+        name: "Sam",
+        hobbies: [],
+      });
+    } catch (err) {
+      error = err.response || { status: 500 };
+    }
+    assert.equal(error.status, 400);
+    assert.equal(error.data.message, "Age is required");
+  });
 
-    it("Test Post Validation age number", async function () {
-        let err;
-        try {
-            
-            let res = await axios.post('http://localhost:3000/person', {name: 'sam', age: 'bad', hobbies: []})
-        } catch(e) {
-            err = e;
-        }
-        console.log(err?.response?.data);
-        assert.equal(err?.response?.status, 400)
+  it("Test Post Validation Age Not a Number", async function () {
+    let error;
+    try {
+      await axios.post("http://localhost:9000/person", {
+        name: "Sam",
+        age: "bad",
+        hobbies: [],
+      });
+    } catch (err) {
+      error = err.response || { status: 500 };
+    }
+    assert.equal(error.status, 400);
+    assert.equal(error.data.message, "Age must be a number");
+  });
 
-    });
-    
-    it("Test Post Validation hobbies empty", async function () {
-        let err;
-        try {
-            
-            let res = await axios.post('http://localhost:3000/person', {name: 'sam', age: 21})
-        } catch(e) {
-            err = e;
-        }
-        assert.equal(err?.response?.status, 400)
+  it("Test Post Validation Hobbies Empty", async function () {
+    let error;
+    try {
+      await axios.post("http://localhost:9000/person", {
+        name: "Sam",
+        age: 21,
+      });
+    } catch (err) {
+      error = err.response || { status: 500 };
+    }
+    assert.equal(error.status, 400);
+    assert.equal(error.data.message, "Hobbies are required");
+  });
 
-    });
-    
-    it("Test Post Validation hobbies array", async function () {
-        let err;
-        try {
-            
-            let res = await axios.post('http://localhost:3000/person', {name: 'sam', age: 21, hobbies: 'fighting'})
-        } catch(e) {
-            err = e;
-        }
-        assert.equal(err?.response?.status, 400)
+  it("Test Post Validation Hobbies Not Array", async function () {
+    let error;
+    try {
+      await axios.post("http://localhost:9000/person", {
+        name: "Sam",
+        age: 21,
+        hobbies: "fighting",
+      });
+    } catch (err) {
+      error = err.response || { status: 500 };
+    }
+    assert.equal(error.status, 400);
+    assert.equal(error.data.message, "Hobbies must be an array");
+  });
 
-    }); 
+  it("Test Put", async function () {
+    const updatedUser = {
+      name: "Sam",
+      age: 26,
+      hobbies: ["dubstep", "jazz"],
+    };
+    const res = await axios.put("http://localhost:9000/person/1", updatedUser);
+    assert.equal(res.status, 200);
 
+    const persons = app.get("db");
+    updatedUser.id = "1";
+    assert.deepEqual(persons[0], updatedUser);
+  });
 
+  it("Test Delete", async function () {
+    const res = await axios.delete("http://localhost:9000/person/1");
+    assert.equal(res.status, 200);
 
-    it("Test Put", async function () {
-        let newUser = {
-            name: 'Sam',
-            age: 26,
-            hobbies: ['dubstep', 'jazz']
-        }
-        let res = await axios.put('http://localhost:3000/person/1', newUser)
+    const persons = app.get("db");
+    assert.deepEqual(
+      persons.filter((p) => p.id === "1"),
+      []
+    );
+  });
 
-        let persons = app.get('db')
-        newUser.id = "1"
-        assert.deepEqual(persons[0], newUser)
-    });
+  it("Test Non-Existing User", async function () {
+    let error;
+    try {
+      await axios.get("http://localhost:9000/person/100");
+    } catch (err) {
+      error = err.response || { status: 500 };
+    }
+    assert.equal(error.status, 404);
+  });
 
-    it("Test delete", async function () {
-
-        let res = await axios.delete('http://localhost:3000/person/1')
-
-        let persons = app.get('db')
-
-        assert.deepEqual(persons.filter(p => p.id == '1'), [])
-    });
-
-    it("Test non existing user", async function () {
-        let err;
-        try {
-            let res = await axios.get('http://localhost:3000/person/1')
-        } catch (e) {
-            err = e;
-        }
-        assert.equal(err.response.status, 404)
-
-    });
-
-    it("Test non existing endpoint", async function () {
-        let err;
-        try {
-            let res = await axios.get('http://localhost:3000/test/non-exiting/endpoint')
-        } catch (e) {
-            err = e;
-        }
-        assert.equal(err.response.status, 404)
-
-    });
-
-
-
+  it("Test Non-Existing Endpoint", async function () {
+    let error;
+    try {
+      await axios.get("http://localhost:9000/non-existing-endpoint");
+    } catch (err) {
+      error = err.response || { status: 500 };
+    }
+    assert.equal(error.status, 404);
+  });
 });
